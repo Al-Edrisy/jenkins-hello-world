@@ -1,11 +1,16 @@
 pipeline {
     agent {
-        docker { image 'python:3.11' }
+        docker {
+            image 'python:3.11'
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
+        }
+    }
+    environment {
+        GIT_CREDENTIALS = credentials('d1ab74e8-9583-4548-84f6-8b487952eae2')
     }
     stages {
         stage('Clone Repo') {
             steps {
-                echo 'Cloning repo...'
                 checkout scm
             }
         }
@@ -17,6 +22,23 @@ pipeline {
         stage('Run Tests') {
             steps {
                 sh 'pytest'
+            }
+        }
+        stage('Custom Steps') {
+            steps {
+                // Run commands individually in sh steps so they run inside Docker container
+                sh 'echo "Hello World From ${BUILD_URL} By ${CHANGE_AUTHOR}"'
+                sh 'ls -ltr'
+                sh 'echo "1234567890123456789" > test.txt'
+                sh 'ls -ltr'
+                sh '''
+                    git config user.name "jenkins"
+                    git config user.email "jenkins@example.com"
+                    git add test.txt
+                    git commit -m "We add the test file." || echo "No changes to commit"
+                    git remote set-url origin https://${GIT_CREDENTIALS_USR}:${GIT_CREDENTIALS_PSW}@github.com/Al-Edrisy/jenkins-hello-world.git
+                    git push origin main || echo "Push failed, check credentials"
+                '''
             }
         }
         stage('Build Complete') {
