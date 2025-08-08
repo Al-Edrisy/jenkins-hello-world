@@ -32,8 +32,8 @@ pipeline {
                 sh 'echo "1234567890123456789" > test.txt'
                 sh 'ls -ltr'
                 sh '''
-                    git config user.name "jenkins"
-                    git config user.email "jenkins@example.com"
+                    git config user.name "Al-Edrisy"
+                    git config user.email "salehfree33@gmailcom"
                     git add test.txt
                     git commit -m "We add the test file." || echo "No changes to commit"
                     git remote set-url origin https://${GIT_CREDENTIALS_USR}:${GIT_CREDENTIALS_PSW}@github.com/Al-Edrisy/jenkins-hello-world.git
