@@ -24,6 +24,24 @@ pipeline {
                 sh 'pytest'
             }
         }
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t jenkins-flask-app .'
+            }
+        }
+        stage('Run Docker Container') {
+            steps {
+                sh 'docker run -d --name flask-app -p 9090:9090 jenkins-flask-app'
+                sh 'sleep 5'
+                sh 'curl -f http://localhost:9090 || echo "Container health check failed"'
+            }
+            post {
+                always {
+                    sh 'docker stop flask-app || true'
+                    sh 'docker rm flask-app || true'
+                }
+            }
+        }
         stage('Custom Steps') {
             steps {
                 // Run commands individually in sh steps so they run inside Docker container
