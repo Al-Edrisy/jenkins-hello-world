@@ -1,14 +1,31 @@
 pipeline {
     agent {
         docker {
-            image 'python:3.11'
+            image 'python:3.11-slim'
             args '-v /var/run/docker.sock:/var/run/docker.sock'
         }
     }
     environment {
         GIT_CREDENTIALS = credentials('d1ab74e8-9583-4548-84f6-8b487952eae2')
+        PYTHONPATH = "${WORKSPACE}"
     }
     stages {
+        stage('Verify Environment') {
+            steps {
+                script {
+                    echo "Checking Python installation..."
+                    sh '''
+                        which python3
+                        python3 --version
+                        which pip3
+                        pip3 --version
+                        echo "Current directory: $(pwd)"
+                        echo "Python path: $PYTHONPATH"
+                        ls -la
+                    '''
+                }
+            }
+        }
         stage('Clone Repo') {
             steps {
                 checkout scm
@@ -16,39 +33,54 @@ pipeline {
         }
         stage('Install Dependencies') {
             steps {
-                sh 'pip install -r requirements.txt'
+                sh '''
+                    pip3 install --upgrade pip
+                    pip3 install -r requirements.txt
+                    pip3 list
+                '''
             }
         }
         stage('Run Tests') {
             steps {
-                sh 'pytest'
+                sh '''
+                    python3 -m pytest tests/ -v
+                '''
             }
         }
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t jenkins-flask-app .'
+                sh '''
+                    docker --version
+                    docker build -t jenkins-flask-app .
+                    docker images | grep jenkins-flask-app
+                '''
             }
         }
         stage('Run Docker Container') {
             steps {
-                sh 'docker run -d --name flask-app -p 9090:9090 jenkins-flask-app'
-                sh 'sleep 5'
-                sh 'curl -f http://localhost:9090 || echo "Container health check failed"'
+                sh '''
+                    docker run -d --name flask-app -p 9090:9090 jenkins-flask-app
+                    sleep 5
+                    curl -f http://localhost:9090 || echo "Container health check failed"
+                '''
             }
             post {
                 always {
-                    sh 'docker stop flask-app || true'
-                    sh 'docker rm flask-app || true'
+                    sh '''
+                        docker stop flask-app || true
+                        docker rm flask-app || true
+                    '''
                 }
             }
         }
         stage('Custom Steps') {
             steps {
-                // Run commands individually in sh steps so they run inside Docker container
-                sh 'echo "Hello World From ${BUILD_URL} By ${CHANGE_AUTHOR}"'
-                sh 'ls -ltr'
-                sh 'echo "1234567890123456789" > test.txt'
-                sh 'ls -ltr'
+                sh '''
+                    echo "Hello World From ${BUILD_URL} By ${CHANGE_AUTHOR}"
+                    ls -ltr
+                    echo "1234567890123456789" > test.txt
+                    ls -ltr
+                '''
                 sh '''
                     git config user.name "Al-Edrisy"
                     git config user.email "salehfree33@gmail.com"
@@ -63,6 +95,21 @@ pipeline {
             steps {
                 echo 'Build finished successfully!'
             }
+        }
+    }
+    post {
+        always {
+            echo "Build completed with result: ${currentBuild.result}"
+            sh '''
+                echo "Cleaning up workspace..."
+                docker system prune -f || true
+            '''
+        }
+        success {
+            echo "Pipeline executed successfully!"
+        }
+        failure {
+            echo "Pipeline failed! Check the logs for details."
         }
     }
 }
